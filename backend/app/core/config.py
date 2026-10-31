@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     DB_HOST: str = "localhost"
     DB_PORT: int = 3306
     DB_USER: str = "root"
-    DB_PASSWORD: str = ""
-    DB_NAME: str = "clothing_ecommerce"
+    DB_PASSWORD: str = "Rohit@5159"
+    DB_NAME: str = "clothing_ecommerce_db"
     DB_ECHO: bool = False
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20

@@ -221,6 +221,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     INDEX idx_oi_variant (variant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =============================================================================
@@ -243,3 +244,4 @@ INSERT INTO products (id, category_id, title, slug, description, base_price, is_
 INSERT INTO product_variants (id, product_id, sku, size, color_name, color_hex, price_adjustment, stock_quantity) VALUES
 (101, 1, 'JKT-COT-NVY-M', 'M', 'Navy Blue', '#000080', 0.00, 25),
 (102, 1, 'JKT-COT-NVY-L', 'L', 'Navy Blue', '#000080', 5.00, 15);
+

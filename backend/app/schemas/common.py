@@ -24,6 +24,24 @@ class HealthResponse(BaseModel):
     )
 
 
+class DatabaseHealthResponse(BaseModel):
+    """ Database connection verification responce schema """
+    status: str = Field(
+        default="healthy",
+        description="API operational status",
+        examples=["healthy"],
+    )
+    database_connection: str = Field(
+        default="connected",
+        description="Database connection status",
+        examples=["connected"],
+    )
+    database_type: str = Field(
+        default="MySQL",
+        description="database engine type",
+        examples=["MySQL"],
+    )
+
 class APIResponse(BaseSchema, Generic[T]):
     """Standard generic API response envelope."""
 

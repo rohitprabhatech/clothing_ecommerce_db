@@ -4,13 +4,13 @@ from app.core.config import Settings
 def test_config_computed_uri() -> None:
     test_settings = Settings(
         DB_HOST="127.0.0.1",
-        DB_PORT=3306,
+        DB_PORT=5432,
         DB_USER="ecommerce_user",
         DB_PASSWORD="p@ssword#123",
-        DB_NAME="clothing_ecommerce",
+        DB_NAME="clothing_ecommerce_db",
     )
     uri = test_settings.SQLALCHEMY_DATABASE_URI
-    assert uri.startswith("mysql+pymysql://ecommerce_user:p%40ssword%23123@127.0.0.1:3306/clothing_ecommerce")
+    assert uri.startswith("postgresql+psycopg://ecommerce_user:p%40ssword%23123@127.0.0.1:5432/clothing_ecommerce_db")
 
 
 def test_cors_origins_parsing() -> None:

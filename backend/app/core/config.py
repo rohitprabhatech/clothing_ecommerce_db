@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Optional, Union
 from urllib.parse import quote_plus
 from pydantic import computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,11 +35,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # MySQL Database Connection
+    # PostgreSQL Database Connection
+    DATABASE_URL: Optional[str] = None
     DB_HOST: str = "localhost"
-    DB_PORT: int = 3306
-    DB_USER: str = "root"
-    DB_PASSWORD: str = "Rohit@5159"
+    DB_PORT: int = 5432
+    DB_USER: str = "postgres"
+    DB_PASSWORD: str = ""
     DB_NAME: str = "clothing_ecommerce_db"
     DB_ECHO: bool = False
     DB_POOL_SIZE: int = 10
@@ -83,13 +84,21 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
-        """Construct MySQL SQLAlchemy 2.0 connection URI."""
+        """Construct PostgreSQL SQLAlchemy 2.0 connection URI."""
+        if self.DATABASE_URL:
+            # Handle standard postgres:// URLs from managed providers
+            if self.DATABASE_URL.startswith("postgres://"):
+                return self.DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+            elif self.DATABASE_URL.startswith("postgresql://") and not self.DATABASE_URL.startswith("postgresql+"):
+                return self.DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+            return self.DATABASE_URL
+
         password_part = (
             f":{quote_plus(self.DB_PASSWORD)}" if self.DB_PASSWORD else ""
         )
         return (
-            f"mysql+pymysql://{quote_plus(self.DB_USER)}{password_part}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
+            f"postgresql+psycopg://{quote_plus(self.DB_USER)}{password_part}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
 

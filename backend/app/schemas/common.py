@@ -25,7 +25,8 @@ class HealthResponse(BaseModel):
 
 
 class DatabaseHealthResponse(BaseModel):
-    """ Database connection verification responce schema """
+    """Database connection verification response schema."""
+
     status: str = Field(
         default="healthy",
         description="API operational status",
@@ -37,9 +38,27 @@ class DatabaseHealthResponse(BaseModel):
         examples=["connected"],
     )
     database_type: str = Field(
-        default="MySQL",
-        description="database engine type",
-        examples=["MySQL"],
+        default="PostgreSQL",
+        description="Database engine type",
+        examples=["PostgreSQL"],
+    )
+
+
+class SystemHealthResponse(BaseModel):
+    """System diagnostic and environment health response schema."""
+
+    status: str = Field(
+        default="healthy",
+        description="System operational status",
+        examples=["healthy"],
+    )
+    app_name: str = Field(..., description="Application name")
+    version: str = Field(..., description="Application semantic version")
+    environment: str = Field(..., description="Application runtime environment")
+    python_version: str = Field(..., description="Active Python version")
+    database_dialect: str = Field(
+        default="PostgreSQL",
+        description="Configured database engine dialect",
     )
 
 class APIResponse(BaseSchema, Generic[T]):

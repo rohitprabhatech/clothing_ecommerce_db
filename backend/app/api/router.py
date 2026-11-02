@@ -1,10 +1,12 @@
+import sys
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.api.v1 import (auth,cart,catalog,categories,orders,payments,users,)
-from app.schemas.common import HealthResponse,DatabaseHealthResponse
+from app.api.v1 import (auth, cart, catalog, categories, orders, payments, users)
+from app.core.config import settings
+from app.core.database import get_db
+from app.schemas.common import DatabaseHealthResponse, HealthResponse, SystemHealthResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 import structlog
-from app.core.database import get_db
 
 
 logger = structlog.get_logger(__name__)
@@ -32,7 +34,7 @@ def get_health() -> HealthResponse:
     "/health/database",
     response_model=DatabaseHealthResponse,
     summary="Database Connection Health Check",
-    description="Verify active connectivity to the MySQL database by executing a ping query.",
+    description="Verify active connectivity to the PostgreSQL database by executing a ping query.",
     tags=["Health"],
     responses={
         200: {
@@ -45,7 +47,7 @@ def get_health() -> HealthResponse:
     },
 )
 def get_database_health(db: Session = Depends(get_db)) -> DatabaseHealthResponse:
-    """Execute a lightweight query to verify MySQL database connectivity."""
+    """Execute a lightweight query to verify PostgreSQL database connectivity."""
     try:
         # Execute safe SELECT 1 ping query
         result = db.execute(text("SELECT 1")).scalar()
@@ -54,7 +56,7 @@ def get_database_health(db: Session = Depends(get_db)) -> DatabaseHealthResponse
         return DatabaseHealthResponse(
             status="healthy",
             database_connection="connected",
-            database_type="MySQL",
+            database_type="PostgreSQL",
         )
     except Exception as exc:
         # Log error internally for debugging without leaking credentials to client
@@ -64,10 +66,29 @@ def get_database_health(db: Session = Depends(get_db)) -> DatabaseHealthResponse
             detail={
                 "status": "unhealthy",
                 "database_connection": "disconnected",
-                "database_type": "MySQL",
-                "message": "Unable to connect to the database. Please verify database availability.",
+                "database_type": "PostgreSQL",
+                "message": "Unable to connect to the database. Please verify database availability and credentials.",
             },
         )
+
+
+@api_router.get(
+    "/health/system",
+    response_model=SystemHealthResponse,
+    summary="System Diagnostic Health Check",
+    description="Check application runtime metadata, environment, and dialect configuration.",
+    tags=["Health"],
+)
+def get_system_health() -> SystemHealthResponse:
+    """Return system diagnostic and environment health status."""
+    return SystemHealthResponse(
+        status="healthy",
+        app_name=settings.APP_NAME,
+        version=settings.APP_VERSION,
+        environment=settings.APP_ENV,
+        python_version=sys.version.split()[0],
+        database_dialect="PostgreSQL",
+    )
 
 
 

@@ -21,8 +21,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set SQLAlchemy database URL dynamically from app settings
-config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
+# Set SQLAlchemy database URL dynamically from app settings (escaping % for configparser interpolation)
+escaped_url = settings.SQLALCHEMY_DATABASE_URI.replace("%", "%%")
+config.set_main_option("sqlalchemy.url", escaped_url)
 
 # Target metadata for 'autogenerate' support
 target_metadata = Base.metadata

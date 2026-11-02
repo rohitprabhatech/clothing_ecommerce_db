@@ -14,368 +14,305 @@ USE clothing_ecommerce_db;
 -- Ensure strict SQL mode for transactional and data integrity
 SET sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
 
+-- ============================================================================
+-- PRABHA TECHNOLOGY - CLOTHING E-COMMERCE PRODUCTION DATABASE SCHEMA (PostgreSQL)
+-- ============================================================================
 
-
--- ==============================================================================
--- Description: Part 2 - User Management, Roles, RBAC Junction, and Addresses
--- ==============================================================================
-
--- Table 1: roles
--- Defines system access roles (Customer, Store Admin, Super Admin) for RBAC enforcement[cite: 20].
-CREATE TABLE IF NOT EXISTS roles (
-    role_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    role_name VARCHAR(50) NOT NULL UNIQUE,
-    description VARCHAR(255) NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Table 2: users
--- Stores customer and administrative user credentials, profiles, and authentication data[cite: 15, 20].
-CREATE TABLE IF NOT EXISTS users (
-    user_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    email VARCHAR(255) NOT NULL UNIQUE,
+-- 1. USERS, ROLES & AUTHENTICATION
+CREATE TABLE users (
+    user_id BIGSERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    phone_number VARCHAR(20) NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
-    INDEX idx_users_email (email),
-    INDEX idx_users_status (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    last_name VARCHAR(100),
+    phone_number VARCHAR(20) UNIQUE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMPTZ
+);
 
--- Table 3: user_roles (Junction Table for Users and Roles M:N)
--- Resolves the many-to-many relationship between users and system roles[cite: 15, 20].
-CREATE TABLE IF NOT EXISTS user_roles (
-    user_id INT UNSIGNED NOT NULL,
-    role_id INT UNSIGNED NOT NULL,
-    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, role_id),
-    CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_user_roles_role FOREIGN KEY (role_id) REFERENCES roles (role_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    INDEX idx_user_roles_user (user_id),
-    INDEX idx_user_roles_role (role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE roles (
+    role_id SERIAL PRIMARY KEY,
+    role_name VARCHAR(50) UNIQUE NOT NULL, -- e.g., 'customer', 'admin', 'warehouse_manager'
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
--- Table 4: user_addresses
--- Stores customer shipping and billing addresses for order fulfillment[cite: 15, 20].
-CREATE TABLE IF NOT EXISTS user_addresses (
-    address_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
+CREATE TABLE user_roles (
+    user_id BIGINT REFERENCES users(user_id) ON DELETE CASCADE,
+    role_id INT REFERENCES roles(role_id) ON DELETE CASCADE,
+    assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, role_id)
+);
+
+CREATE TABLE user_addresses (
+    address_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     recipient_name VARCHAR(150) NOT NULL,
-    street_address VARCHAR(255) NOT NULL,
-    apartment_suite VARCHAR(100) NULL,
+    street_address TEXT NOT NULL,
+    apartment_suite VARCHAR(100),
     city VARCHAR(100) NOT NULL,
     state VARCHAR(100) NOT NULL,
     postal_code VARCHAR(20) NOT NULL,
-    country VARCHAR(100) NOT NULL DEFAULT 'United States',
+    country VARCHAR(100) DEFAULT 'India',
     phone_number VARCHAR(20) NOT NULL,
-    is_default TINYINT(1) NOT NULL DEFAULT 0,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_user_addresses_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    INDEX idx_user_addresses_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
-
--- ==============================================================================
--- Description: Part 3 - Categories, Products, Variants, Images, and Inventory
--- ==============================================================================
-
--- Table 5: categories
--- Organizes clothing into hierarchical multi-level categories (Self-referencing parent-child)[cite: 20].
-CREATE TABLE IF NOT EXISTS categories (
-    category_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    parent_id INT UNSIGNED NULL,
+-- 2. CATEGORIES, SIZE CHARTS & PRODUCTS
+CREATE TABLE categories (
+    category_id SERIAL PRIMARY KEY,
+    parent_id INT REFERENCES categories(category_id) ON DELETE SET NULL,
     category_name VARCHAR(100) NOT NULL,
-    slug VARCHAR(120) NOT NULL UNIQUE,
-    description TEXT NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_categories_parent FOREIGN KEY (parent_id) REFERENCES categories (category_id) ON DELETE SET NULL ON UPDATE CASCADE,
-    INDEX idx_categories_slug (slug),
-    INDEX idx_categories_parent (parent_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    slug VARCHAR(120) UNIQUE NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
--- Table 6: products
--- Stores master clothing product catalog details (name, brand, base description)[cite: 20].
-CREATE TABLE IF NOT EXISTS products (
-    product_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    category_id INT UNSIGNED NOT NULL,
-    product_name VARCHAR(150) NOT NULL,
-    slug VARCHAR(180) NOT NULL UNIQUE,
-    brand VARCHAR(100) NOT NULL,
-    description TEXT NOT NULL,
-    base_price DECIMAL(10, 2) NOT NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES categories (category_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT chk_products_base_price CHECK (base_price >= 0.00),
-    INDEX idx_products_category (category_id),
-    INDEX idx_products_brand (brand),
-    INDEX idx_products_slug (slug)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- NEW: Size Charts for Apparel (Can be linked per category or product)
+CREATE TABLE size_charts (
+    size_chart_id SERIAL PRIMARY KEY,
+    category_id INT REFERENCES categories(category_id) ON DELETE SET NULL,
+    chart_name VARCHAR(100) NOT NULL, -- e.g., 'Men Regular Fit Shirts', 'Women Kurtis'
+    measurements_json JSONB NOT NULL, -- e.g., [{"size": "M", "chest_in": 40, "length_in": 28, "shoulder_in": 17.5}]
+    measurement_guide_image_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
--- Table 7: product_variants
--- Tracks specific clothing attributes (Size, Color, Material) and unique SKU bindings[cite: 20].
-CREATE TABLE IF NOT EXISTS product_variants (
-    variant_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    product_id INT UNSIGNED NOT NULL,
-    sku VARCHAR(100) NOT NULL UNIQUE,
-    size VARCHAR(20) NOT NULL,
-    color VARCHAR(50) NOT NULL,
-    material VARCHAR(100) NULL,
-    price_override DECIMAL(10, 2) NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_product_variants_product FOREIGN KEY (product_id) REFERENCES products (product_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT chk_variants_price_override CHECK (price_override IS NULL OR price_override >= 0.00),
-    INDEX idx_variants_product (product_id),
-    INDEX idx_variants_sku (sku)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE products (
+    product_id BIGSERIAL PRIMARY KEY,
+    category_id INT REFERENCES categories(category_id) ON DELETE RESTRICT,
+    size_chart_id INT REFERENCES size_charts(size_chart_id) ON DELETE SET NULL,
+    product_name VARCHAR(255) NOT NULL,
+    slug VARCHAR(280) UNIQUE NOT NULL,
+    brand VARCHAR(100),
+    description TEXT,
+    fit_type VARCHAR(50),          -- NEW: e.g., 'Slim Fit', 'Regular Fit', 'Oversized'
+    fabric_care VARCHAR(255),      -- NEW: e.g., '100% Cotton, Machine Wash Cold'
+    hsn_code VARCHAR(20),          -- NEW: Indian GST HSN code (e.g., '6205' for men's shirts)
+    gst_percentage NUMERIC(5,2) DEFAULT 5.00, -- NEW: Default GST % (5% or 12%)
+    mrp NUMERIC(10, 2) NOT NULL,   -- NEW: Maximum Retail Price (Strike-through price)
+    base_price NUMERIC(10, 2) NOT NULL, -- Selling Price before coupon
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
--- Table 8: product_images
--- Stores image asset URLs and display ordering for products[cite: 21].
-CREATE TABLE IF NOT EXISTS product_images (
-    image_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    product_id INT UNSIGNED NOT NULL,
-    image_url VARCHAR(500) NOT NULL,
-    display_order INT UNSIGNED NOT NULL DEFAULT 0,
-    is_primary TINYINT(1) NOT NULL DEFAULT 0,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_product_images_product FOREIGN KEY (product_id) REFERENCES products (product_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    INDEX idx_product_images_product (product_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE product_variants (
+    variant_id BIGSERIAL PRIMARY KEY,
+    product_id BIGINT NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    sku VARCHAR(100) UNIQUE NOT NULL,
+    size VARCHAR(20) NOT NULL,     -- e.g., 'S', 'M', 'L', 'XL', '32', '34'
+    color VARCHAR(50) NOT NULL,    -- e.g., 'Navy Blue', 'Olive Green'
+    color_hex VARCHAR(10),         -- NEW: Hex code for UI color swatch (e.g., '#000080')
+    material VARCHAR(100),
+    mrp_override NUMERIC(10, 2),   -- NEW: Optional override if XXL has higher MRP
+    price_override NUMERIC(10, 2), -- Optional selling price override
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
--- Table 9: inventory
--- Manages real-time stock levels bound strictly to product variant SKUs[cite: 21].
-CREATE TABLE IF NOT EXISTS inventory (
-    inventory_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    variant_id INT UNSIGNED NOT NULL UNIQUE,
-    stock_quantity INT NOT NULL DEFAULT 0,
-    low_stock_threshold INT NOT NULL DEFAULT 5,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_inventory_variant FOREIGN KEY (variant_id) REFERENCES product_variants (variant_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT chk_inventory_stock_qty CHECK (stock_quantity >= 0),
-    INDEX idx_inventory_variant (variant_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE product_images (
+    image_id BIGSERIAL PRIMARY KEY,
+    product_id BIGINT NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    variant_id BIGINT REFERENCES product_variants(variant_id) ON DELETE SET NULL, -- UPGRADED: Link image to specific color/variant
+    color VARCHAR(50), -- Optional tag so all sizes of 'Navy Blue' share the same image set
+    image_url TEXT NOT NULL,
+    display_order INT DEFAULT 0,
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
+CREATE TABLE inventory (
+    inventory_id BIGSERIAL PRIMARY KEY,
+    variant_id BIGINT UNIQUE NOT NULL REFERENCES product_variants(variant_id) ON DELETE CASCADE,
+    stock_quantity INT NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+    reserved_quantity INT NOT NULL DEFAULT 0 CHECK (reserved_quantity >= 0), -- NEW: Prevents overselling during checkout
+    low_stock_threshold INT DEFAULT 5,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
--- ==============================================================================
--- Description: Part 4 - Carts, Cart Items, Wishlists, and Wishlist Items
--- ==============================================================================
+-- 3. SHOPPING CART & WISHLIST (SUPPORTS GUEST CHECKOUT)
+CREATE TABLE carts (
+    cart_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id) ON DELETE CASCADE, -- Nullable for Guest Users
+    session_id VARCHAR(120), -- NEW: Tracks guest cart via cookie/UUID before login
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
--- Table 10: carts
--- Manages active customer shopping cart sessions[cite: 21].
-CREATE TABLE IF NOT EXISTS carts (
-    cart_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL UNIQUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_carts_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    INDEX idx_carts_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE cart_items (
+    cart_item_id BIGSERIAL PRIMARY KEY,
+    cart_id BIGINT NOT NULL REFERENCES carts(cart_id) ON DELETE CASCADE,
+    variant_id BIGINT NOT NULL REFERENCES product_variants(variant_id) ON DELETE CASCADE,
+    quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (cart_id, variant_id)
+);
 
--- Table 11: cart_items
--- Captures line items within active shopping carts[cite: 21].
-CREATE TABLE IF NOT EXISTS cart_items (
-    cart_item_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    cart_id INT UNSIGNED NOT NULL,
-    variant_id INT UNSIGNED NOT NULL,
-    quantity INT UNSIGNED NOT NULL DEFAULT 1,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_cart_items_cart FOREIGN KEY (cart_id) REFERENCES carts (cart_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_cart_items_variant FOREIGN KEY (variant_id) REFERENCES product_variants (variant_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT chk_cart_item_qty CHECK (quantity > 0),
-    CONSTRAINT uk_cart_variant UNIQUE (cart_id, variant_id),
-    INDEX idx_cart_items_cart (cart_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE wishlists (
+    wishlist_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT UNIQUE NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
--- Table 12: wishlists
--- Stores saved items for registered customers for future purchase[cite: 21].
-CREATE TABLE IF NOT EXISTS wishlists (
-    wishlist_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL UNIQUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_wishlists_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    INDEX idx_wishlists_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE wishlist_items (
+    wishlist_item_id BIGSERIAL PRIMARY KEY,
+    wishlist_id BIGINT NOT NULL REFERENCES wishlists(wishlist_id) ON DELETE CASCADE,
+    variant_id BIGINT NOT NULL REFERENCES product_variants(variant_id) ON DELETE CASCADE,
+    added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (wishlist_id, variant_id)
+);
 
--- Table 13: wishlist_items
--- Line items associated with customer wishlists[cite: 21].
-CREATE TABLE IF NOT EXISTS wishlist_items (
-    wishlist_item_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    wishlist_id INT UNSIGNED NOT NULL,
-    variant_id INT UNSIGNED NOT NULL,
-    added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_wishlist_items_wishlist FOREIGN KEY (wishlist_id) REFERENCES wishlists (wishlist_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_wishlist_items_variant FOREIGN KEY (variant_id) REFERENCES product_variants (variant_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT uk_wishlist_variant UNIQUE (wishlist_id, variant_id),
-    INDEX idx_wishlist_items_wishlist (wishlist_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- 4. MARKETING: DISCOUNTS & ADVERTISEMENTS
+CREATE TABLE discounts (
+    discount_id SERIAL PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('PERCENTAGE', 'FIXED_AMOUNT')),
+    value NUMERIC(10, 2) NOT NULL,
+    min_order_amount NUMERIC(10, 2) DEFAULT 0.00,
+    max_discount_amount NUMERIC(10, 2), -- NEW: Caps % discounts (e.g. 20% off up to Rs 500)
+    expiry_date TIMESTAMPTZ,
+    usage_limit INT,
+    per_user_limit INT DEFAULT 1,       -- NEW: Prevents same user abusing code
+    times_used INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
-
-
--- ==============================================================================
--- Description: Part 5 - Orders, Order Items, Payments, and Shipments
--- ==============================================================================
-
--- Table 14: orders
--- Records completed checkout transactions, order totals, and fulfillment status[cite: 21].
-CREATE TABLE IF NOT EXISTS orders (
-    order_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    address_id INT UNSIGNED NOT NULL,
-    total_amount DECIMAL(10, 2) NOT NULL,
-    order_status ENUM('PENDING', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED') NOT NULL DEFAULT 'PENDING',
-    shipping_fee DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-    tax_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT fk_orders_address FOREIGN KEY (address_id) REFERENCES user_addresses (address_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT chk_orders_total CHECK (total_amount >= 0.00),
-    INDEX idx_orders_user (user_id),
-    INDEX idx_orders_status (order_status),
-    INDEX idx_orders_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Table 15: order_items
--- Captures permanent line-item snapshots (variant SKU, unit price, quantity) for each order[cite: 21].
-CREATE TABLE IF NOT EXISTS order_items (
-    order_item_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    order_id INT UNSIGNED NOT NULL,
-    variant_id INT UNSIGNED NOT NULL,
-    quantity INT UNSIGNED NOT NULL,
-    unit_price DECIMAL(10, 2) NOT NULL,
-    CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_order_items_variant FOREIGN KEY (variant_id) REFERENCES product_variants (variant_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT chk_order_items_qty CHECK (quantity > 0),
-    CONSTRAINT chk_order_items_price CHECK (unit_price >= 0.00),
-    INDEX idx_order_items_order (order_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Table 16: payments
--- Tracks payment gateway transactions and status updates[cite: 22].
-CREATE TABLE IF NOT EXISTS payments (
-    payment_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    order_id INT UNSIGNED NOT NULL,
-    payment_gateway VARCHAR(50) NOT NULL,
-    transaction_ref VARCHAR(150) NOT NULL UNIQUE,
-    amount DECIMAL(10, 2) NOT NULL,
-    status ENUM('PENDING', 'SUCCESS', 'FAILED', 'REFUNDED') NOT NULL DEFAULT 'PENDING',
-    gateway_response TEXT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT chk_payments_amount CHECK (amount >= 0.00),
-    INDEX idx_payments_order (order_id),
-    INDEX idx_payments_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Table 17: shipments
--- Tracks courier details, tracking numbers, and delivery milestones[cite: 22].
-CREATE TABLE IF NOT EXISTS shipments (
-    shipment_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    order_id INT UNSIGNED NOT NULL,
-    courier_name VARCHAR(100) NOT NULL,
-    tracking_number VARCHAR(150) NOT NULL UNIQUE,
-    status ENUM('PREPARING', 'DISPATCHED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'RETURNED') NOT NULL DEFAULT 'PREPARING',
-    shipped_at TIMESTAMP NULL DEFAULT NULL,
-    delivered_at TIMESTAMP NULL DEFAULT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_shipments_order FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    INDEX idx_shipments_order (order_id),
-    INDEX idx_shipments_tracking (tracking_number)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-
-
--- ==============================================================================
--- Description: Part 6 - Returns, Discounts/Coupons, and Advertisements
--- ==============================================================================
-
--- Table 18: returns
--- Manages apparel return requests, inspection status, and refund processing[cite: 22].
-CREATE TABLE IF NOT EXISTS returns (
-    return_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    order_id INT UNSIGNED NOT NULL,
-    reason VARCHAR(255) NOT NULL,
-    status ENUM('REQUESTED', 'APPROVED', 'INSPECTED', 'REJECTED', 'REFUNDED') NOT NULL DEFAULT 'REQUESTED',
-    refund_amount DECIMAL(10, 2) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_returns_order FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT chk_returns_refund CHECK (refund_amount >= 0.00),
-    INDEX idx_returns_order (order_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Table 19: discounts
--- Manages promotional discount codes and promotional pricing rules[cite: 22].
-CREATE TABLE IF NOT EXISTS discounts (
-    discount_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    code VARCHAR(50) NOT NULL UNIQUE,
-    discount_type ENUM('PERCENTAGE', 'FIXED_AMOUNT') NOT NULL,
-    value DECIMAL(10, 2) NOT NULL,
-    min_order_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-    expiry_date DATETIME NOT NULL,
-    usage_limit INT UNSIGNED NULL,
-    times_used INT UNSIGNED NOT NULL DEFAULT 0,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_discount_value CHECK (value > 0.00),
-    INDEX idx_discounts_code (code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Table 20: advertisements
--- Manages promotional banners and frontend marketing displays[cite: 22].
-CREATE TABLE IF NOT EXISTS advertisements (
-    banner_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE advertisements (
+    banner_id SERIAL PRIMARY KEY,
     title VARCHAR(150) NOT NULL,
-    image_url VARCHAR(500) NOT NULL,
-    link_url VARCHAR(500) NULL,
-    display_order INT UNSIGNED NOT NULL DEFAULT 0,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    start_date DATETIME NULL,
-    end_date DATETIME NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    image_url TEXT NOT NULL,
+    link_url TEXT,
+    placement VARCHAR(50) DEFAULT 'HOME_HERO', -- NEW: 'HOME_HERO', 'CATEGORY_TOP', 'PROMO_STRIP'
+    display_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    start_date TIMESTAMPTZ,
+    end_date TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. ORDERS, ITEMS, PAYMENTS, SHIPMENTS & ITEM-LEVEL RETURNS
+CREATE TABLE orders (
+    order_id BIGSERIAL PRIMARY KEY,
+    order_number VARCHAR(50) UNIQUE NOT NULL, -- NEW: Human-readable e.g., 'PT-2026-00001'
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE RESTRICT,
+    address_id BIGINT REFERENCES user_addresses(address_id) ON DELETE SET NULL,
+    shipping_address_snapshot JSONB NOT NULL, -- NEW: Immutable copy of address at checkout time
+    billing_address_snapshot JSONB,           -- NEW: Immutable copy of billing address
+    discount_id INT REFERENCES discounts(discount_id) ON DELETE SET NULL, -- FIXED: Linked to discounts
+    subtotal_amount NUMERIC(10, 2) NOT NULL,  -- NEW: Sum of item selling prices before coupon/shipping
+    discount_amount NUMERIC(10, 2) DEFAULT 0.00, -- NEW: Coupon discount applied
+    shipping_fee NUMERIC(10, 2) DEFAULT 0.00,
+    tax_amount NUMERIC(10, 2) DEFAULT 0.00,   -- Total GST amount
+    total_amount NUMERIC(10, 2) NOT NULL,     -- Final payable: subtotal - discount + tax + shipping
+    payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('PREPAID', 'COD')), -- NEW
+    payment_status VARCHAR(30) DEFAULT 'PENDING' CHECK (payment_status IN ('PENDING', 'PAID', 'FAILED', 'REFUNDED', 'PARTIALLY_REFUNDED')), -- NEW
+    order_status VARCHAR(30) DEFAULT 'PENDING' CHECK (order_status IN ('PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED')),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE order_items (
+    order_item_id BIGSERIAL PRIMARY KEY,
+    order_id BIGINT NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+    variant_id BIGINT NOT NULL REFERENCES product_variants(variant_id) ON DELETE RESTRICT,
+    product_name_snapshot VARCHAR(255) NOT NULL, -- NEW: Snapshot in case product is renamed
+    sku_snapshot VARCHAR(100) NOT NULL,          -- NEW: Snapshot of SKU
+    quantity INT NOT NULL CHECK (quantity > 0),
+    mrp NUMERIC(10, 2) NOT NULL,                 -- NEW: Original MRP at purchase
+    unit_price NUMERIC(10, 2) NOT NULL,          -- Selling price per unit
+    discount_share NUMERIC(10, 2) DEFAULT 0.00,  -- NEW: Prorated coupon discount for this item (crucial for single-item refunds)
+    tax_percentage NUMERIC(5, 2) NOT NULL,       -- NEW: GST slab applied (e.g., 5% or 12%)
+    tax_amount NUMERIC(10, 2) NOT NULL,          -- NEW: Exact GST calculated on this item
+    net_total NUMERIC(10, 2) NOT NULL,           -- NEW: Final paid amount for this line item
+    item_status VARCHAR(30) DEFAULT 'CONFIRMED' CHECK (item_status IN ('CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURN_REQUESTED', 'RETURNED', 'EXCHANGED'))
+);
+
+CREATE TABLE payments (
+    payment_id BIGSERIAL PRIMARY KEY,
+    order_id BIGINT NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+    payment_gateway VARCHAR(50) NOT NULL, -- e.g., 'Razorpay', 'Cashfree', 'PhonePe', 'COD'
+    transaction_ref VARCHAR(150),
+    amount NUMERIC(10, 2) NOT NULL,
+    status VARCHAR(30) NOT NULL CHECK (status IN ('INITIATED', 'SUCCESS', 'FAILED', 'REFUNDED')),
+    gateway_response JSONB, -- Upgraded to JSONB to store Razorpay/Stripe webhook payload
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE shipments (
+    shipment_id BIGSERIAL PRIMARY KEY,
+    order_id BIGINT NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+    shipping_aggregator VARCHAR(50), -- NEW: e.g., 'Shiprocket', 'Delhivery', 'BlueDart'
+    courier_name VARCHAR(100),
+    tracking_number VARCHAR(100),    -- AWB Number
+    tracking_url TEXT,               -- NEW: Direct tracking link for customer
+    status VARCHAR(50) DEFAULT 'MANIFESTED',
+    shipped_at TIMESTAMPTZ,
+    delivered_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- UPGRADED: Supports item-level returns & size exchanges (Crucial for Clothing!)
+CREATE TABLE returns (
+    return_id BIGSERIAL PRIMARY KEY,
+    order_id BIGINT NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+    order_item_id BIGINT NOT NULL REFERENCES order_items(order_item_id) ON DELETE RESTRICT, -- Links to specific garment!
+    return_type VARCHAR(20) NOT NULL CHECK (return_type IN ('REFUND', 'EXCHANGE')),
+    exchange_variant_id BIGINT REFERENCES product_variants(variant_id), -- Populated if customer wants a different size (e.g., M -> L)
+    return_quantity INT NOT NULL DEFAULT 1 CHECK (return_quantity > 0),
+    reason VARCHAR(255) NOT NULL, -- e.g., 'SIZE_TOO_SMALL', 'SIZE_TOO_LARGE', 'DEFECTIVE', 'COLOR_MISMATCH'
+    customer_comments TEXT,
+    qc_status VARCHAR(30) DEFAULT 'PENDING' CHECK (qc_status IN ('PENDING', 'PASSED', 'FAILED')), -- Quality check upon warehouse receipt
+    status VARCHAR(30) DEFAULT 'REQUESTED' CHECK (status IN ('REQUESTED', 'APPROVED', 'PICKUP_SCHEDULED', 'PICKED_UP', 'COMPLETED', 'REJECTED')),
+    refund_amount NUMERIC(10, 2) DEFAULT 0.00,
+    reverse_tracking_number VARCHAR(100),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. PRODUCT REVIEWS (WITH VERIFIED PURCHASE & CUSTOMER PHOTOS)
+CREATE TABLE reviews (
+    review_id BIGSERIAL PRIMARY KEY,
+    product_id BIGINT NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    order_item_id BIGINT REFERENCES order_items(order_item_id) ON DELETE SET NULL, -- NEW: Proves verified buyer
+    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    fit_feedback VARCHAR(30) CHECK (fit_feedback IN ('TRUE_TO_SIZE', 'RUNS_SMALL', 'RUNS_LARGE')), -- NEW: Apparel fit feedback
+    comment TEXT,
+    review_images_json JSONB, -- NEW: Array of image URLs uploaded by customer
+    is_active BOOLEAN DEFAULT TRUE,
+    is_approved BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- ESSENTIAL PERFORMANCE INDEXES
+-- ============================================================================
+CREATE INDEX idx_products_category ON products(category_id) WHERE is_active = TRUE;
+CREATE INDEX idx_products_slug ON products(slug);
+CREATE INDEX idx_variants_product ON product_variants(product_id);
+CREATE INDEX idx_variants_color_size ON product_variants(color, size);
+CREATE INDEX idx_orders_user ON orders(user_id);
+CREATE INDEX idx_orders_number ON orders(order_number);
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_carts_session ON carts(session_id);
 
 
--- ==============================================================================
--- Description: Part 7 - Reviews and Supporting Tables
--- ==============================================================================
 
--- Table 21: reviews
--- Stores customer star ratings and text feedback on purchased clothing items[cite: 22].
-CREATE TABLE IF NOT EXISTS reviews (
-    review_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    product_id INT UNSIGNED NOT NULL,
-    user_id INT UNSIGNED NOT NULL,
-    rating TINYINT UNSIGNED NOT NULL,
-    comment TEXT NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    is_approved TINYINT(1) NOT NULL DEFAULT 0,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_reviews_product FOREIGN KEY (product_id) REFERENCES products (product_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_reviews_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT chk_reviews_rating CHECK (rating BETWEEN 1 AND 5),
-    CONSTRAINT uk_user_product_review UNIQUE (user_id, product_id),
-    INDEX idx_reviews_product (product_id),
-    INDEX idx_reviews_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-show tables;
-
-
-
+SELECT tablename
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY tablename;

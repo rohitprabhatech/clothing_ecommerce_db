@@ -1,0 +1,103 @@
+import sys
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.api.v1 import (auth, cart, catalog, categories, orders, payments, users)
+from app.core.config import settings
+from app.core.database import get_db
+from app.schemas.common import DatabaseHealthResponse, HealthResponse, SystemHealthResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+import structlog
+
+
+logger = structlog.get_logger(__name__)
+
+# Primary API Router (version 1)
+api_router = APIRouter()
+
+
+@api_router.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="Service Health Check",
+    description="Check the operational health and availability of the Clothing Ecommerce API.",
+    tags=["Health"],
+)
+def get_health() -> HealthResponse:
+    """Return backend health status."""
+    return HealthResponse(
+        status="success",
+        message="Clothing Ecommerce API is running",
+    )
+
+
+@api_router.get(
+    "/health/database",
+    response_model=DatabaseHealthResponse,
+    summary="Database Connection Health Check",
+    description="Verify active connectivity to the PostgreSQL database by executing a ping query.",
+    tags=["Health"],
+    responses={
+        200: {
+            "description": "Database connection is healthy and responsive.",
+            "model": DatabaseHealthResponse,
+        },
+        503: {
+            "description": "Database connection failed or database is unreachable.",
+        },
+    },
+)
+def get_database_health(db: Session = Depends(get_db)) -> DatabaseHealthResponse:
+    """Execute a lightweight query to verify PostgreSQL database connectivity."""
+    try:
+        # Execute safe SELECT 1 ping query
+        result = db.execute(text("SELECT 1")).scalar()
+        if result != 1:
+            raise Exception("Database ping query returned an unexpected result.")
+        return DatabaseHealthResponse(
+            status="healthy",
+            database_connection="connected",
+            database_type="PostgreSQL",
+        )
+    except Exception as exc:
+        # Log error internally for debugging without leaking credentials to client
+        logger.error("database_health_check_failed", error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "unhealthy",
+                "database_connection": "disconnected",
+                "database_type": "PostgreSQL",
+                "message": "Unable to connect to the database. Please verify database availability and credentials.",
+            },
+        )
+
+
+@api_router.get(
+    "/health/system",
+    response_model=SystemHealthResponse,
+    summary="System Diagnostic Health Check",
+    description="Check application runtime metadata, environment, and dialect configuration.",
+    tags=["Health"],
+)
+def get_system_health() -> SystemHealthResponse:
+    """Return system diagnostic and environment health status."""
+    return SystemHealthResponse(
+        status="healthy",
+        app_name=settings.APP_NAME,
+        version=settings.APP_VERSION,
+        environment=settings.APP_ENV,
+        python_version=sys.version.split()[0],
+        database_dialect="PostgreSQL",
+    )
+
+
+
+# Register modular v1 route modules
+api_router.include_router(auth.router)
+api_router.include_router(users.router)
+api_router.include_router(catalog.router)
+api_router.include_router(categories.router)
+api_router.include_router(cart.router)
+api_router.include_router(orders.router)
+api_router.include_router(payments.router)
+

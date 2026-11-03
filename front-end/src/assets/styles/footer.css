@@ -1,0 +1,53 @@
+/* ==========================================
+   Aura Fashion Professional Footer Styles
+   ========================================== */
+
+footer {
+  font-family: inherit;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+footer ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+footer ul li {
+  margin-bottom: 0.5rem;
+}
+
+footer ul li a {
+  color: var(--text-muted, #4b5563);
+  text-decoration: none;
+  font-size: 0.813rem;
+  transition: color 0.2s ease;
+}
+
+footer ul li a:hover {
+  color: var(--accent-pink, #e91e63);
+  font-weight: 600;
+}
+
+/* Footer Offerings Links Paragraph */
+footer p a {
+  color: var(--text-muted, #4b5563);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+footer p a:hover {
+  color: var(--text-main, #111827);
+  text-decoration: underline;
+}
+
+/* Social Icons Hover */
+footer svg {
+  transition: transform 0.2s ease, color 0.2s ease;
+  cursor: pointer;
+}
+
+footer svg:hover {
+  transform: translateY(-2px);
+  color: var(--accent-pink, #e91e63);
+}

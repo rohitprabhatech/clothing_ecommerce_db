@@ -1,0 +1,124 @@
+/* ==========================================
+   Limeroad-Inspired Header & Mega Menu Styles
+   ========================================== */
+
+.cuP {
+  cursor: pointer;
+}
+
+.ttU {
+  text-transform: uppercase;
+}
+
+.taC {
+  text-align: center;
+}
+
+.fwB {
+  font-weight: bold;
+}
+
+.fs13 {
+  font-size: 0.813rem;
+}
+
+.ls1 {
+  letter-spacing: 1px;
+}
+
+.vM {
+  vertical-align: middle;
+}
+
+.dIb {
+  display: inline-block;
+}
+
+.wsN {
+  white-space: nowrap;
+}
+
+/* Navigation Item Wrapper */
+.nav-item-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* Mega Menu Dropdown Style with Smooth Transition */
+.mega-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(180px, 1fr));
+  gap: 2rem;
+  z-index: 1200;
+  min-width: 950px;
+  
+  /* Smooth Fade & Slide Animation */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
+}
+
+/* Active Hover State for Mega Menu */
+.nav-item-wrapper:hover .mega-menu-dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0px);
+}
+
+/* Subcategories Column Styling */
+.menu-column h4 {
+  font-size: 0.813rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent-pink, #e91e63);
+  margin-bottom: 0.8rem;
+  border-bottom: 1px solid var(--border-color, #eee);
+  padding-bottom: 4px;
+}
+
+.menu-column ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.menu-column ul li a {
+  font-size: 0.813rem;
+  color: var(--text-muted, #4b5563);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+
+.menu-column ul li a:hover {
+  color: var(--text-main, #111827);
+  font-weight: bold;
+}
+
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

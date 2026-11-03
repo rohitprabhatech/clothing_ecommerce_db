@@ -1,11 +1,25 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingBag } from 'lucide-react';
+import SubCategoryBar from '../components/home/SubCategoryBar';
+
 import HeroBanner from '../components/home/HeroBanner';
 import CategorySlider from '../components/home/CategorySlider';
 import ProductSection from '../components/home/ProductSection';
 
 export default function HomePage({ products, onAddToCart, onToggleWishlist, wishlist }) {
+  <div>
+      <SubCategoryBar /> {/* HE LINE BANNER CHYA AADHI TAKAYCHI AHE */}
+      <HeroBanner />
+      <CategorySlider />
+      <ProductSection 
+        title="Trending Collections" 
+        products={products} 
+        onAddToCart={onAddToCart} 
+        onToggleWishlist={onToggleWishlist} 
+        wishlist={wishlist} 
+      />
+    </div>
   const [quickViewProduct, setQuickViewProduct] = useState(null);
 
   const list = products || [
